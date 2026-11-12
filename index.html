@@ -82,6 +82,17 @@
   textarea { resize: vertical; min-height: 64px; }
   input:focus, textarea:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
   .field.empty-mark input, .field.empty-mark textarea { border-color: #f0c36a; background: #fffaf0; }
+  .field[hidden] { display: none; }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .mode-opt {
+    display: flex; gap: 8px; align-items: flex-start; cursor: pointer;
+    border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; font-weight: normal;
+  }
+  .mode-opt:has(input:checked) { border-color: var(--purple); background: var(--purple-soft); }
+  .mode-opt input { margin-top: 4px; accent-color: var(--purple); }
+  .mode-opt b { display: block; font-size: 14px; }
+  .mode-opt small { display: block; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  @media (max-width: 720px) { .modes { grid-template-columns: 1fr; } }
   .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
   button {
     font: inherit; font-weight: bold; font-size: 14px;
@@ -123,14 +134,14 @@
 <header>
   <div class="eyebrow">SOLANA WORKSHOP #3　③ 発表資料の作成</div>
   <h1>発表資料スクリプト作成ツール</h1>
-  <p>チーム情報を入力して「スクリプトを作成」を押すと、勉強会資料のスクリプト全文（付録 1/4〜4/4）と同じ、Claude Code にそのまま貼り付けられる文章ができます。</p>
+  <p>チーム情報を入力して「スクリプトを作成」を押すと、勉強会資料のスクリプト全文（付録 1/4〜4/4）をもとにした、Claude Code にそのまま貼り付けられる文章ができます。解決したい課題がない「アイデア型」の作品にも対応しています。</p>
 </header>
 
 <main>
 
   <section class="card">
     <ul class="steps">
-      <li><span class="num">1</span><span>下の項目にチームの内容を入力する（埋められない項目は空欄のままでよい）</span></li>
+      <li><span class="num">1</span><span>「発表の型」を選び、下の項目にチームの内容を入力する（埋められない項目は空欄のままでよい）</span></li>
       <li><span class="num">2</span><span>「スクリプトを作成」を押し、「コピー」でスクリプトをコピーする</span></li>
       <li><span class="num">3</span><span>Claude Code パネルの入力欄に貼り付けて送信する</span></li>
     </ul>
@@ -174,7 +185,21 @@
 
 <script>
 // ---------------------------------------------------------------------------
-// チーム情報の項目（スクリプト例 2/4 の項目名をそのまま使う）
+// 発表の型（審査項目「アイデア・課題設定」のどちらを軸にするか）
+// ---------------------------------------------------------------------------
+const MODES = {
+  problem: { label: "課題解決型", desc: "誰かの困りごとを解決する作品",
+             team: "課題解決型（誰かの困りごとを解決する）" },
+  idea:    { label: "アイデア型", desc: "解決したい課題は特になく、面白さ・新しさが軸の作品",
+             team: "アイデア型（解決したい課題は特になし。面白さ・新しさが軸）" },
+  both:    { label: "アイデア＋課題", desc: "面白いアイデアがあり、解決する困りごともある作品",
+             team: "アイデア＋課題（アイデアの面白さと、解決する困りごとの両方）" },
+};
+const DEFAULT_MODE = "problem";
+
+// ---------------------------------------------------------------------------
+// チーム情報の項目（スクリプト例 2/4 の項目名をもとにする）
+// modes を持つ項目は、その発表の型のときだけ表示・出力する
 // ---------------------------------------------------------------------------
 const FIELDS = [
   { group: "チームと作品" },
@@ -182,9 +207,16 @@ const FIELDS = [
   { id: "project",  label: "プロジェクト名", type: "text" },
   { id: "members",  label: "メンバー（氏名／所属／担当）", type: "area", wide: true,
     hint: "1人1行で入力（例：山田 花子／〇〇大学 情報学部／UI担当）" },
-  { group: "課題" },
-  { id: "who",      label: "誰の困りごとか（できるだけ具体的な一人として）", type: "area", wide: true },
-  { id: "now",      label: "その人が今どうやって困りごとに対処しているか、かかる時間や手間", type: "area", wide: true },
+  { group: "アイデア・課題設定" },
+  { id: "mode",     label: "発表の型", type: "mode", wide: true,
+    hint: "課題がなくても大丈夫です。作品に合うものを選ぶと、入力項目とスライド構成が切り替わります。" },
+  { id: "ideaWhat", label: "アイデアの中身（何が面白い・新しいか）", type: "area", wide: true, modes: ["idea", "both"] },
+  { id: "ideaWhy",  label: "思いついたきっかけ", type: "area", wide: true, modes: ["idea", "both"] },
+  { id: "ideaFor",  label: "誰に使ってほしいか・どんな場面で楽しめるか", type: "area", wide: true, modes: ["idea", "both"] },
+  { id: "ideaDiff", label: "似たもの・既存のやり方との違い", type: "area", wide: true, modes: ["idea", "both"],
+    hint: "似たものが思いつかなければ空欄でよい" },
+  { id: "who",      label: "誰の困りごとか（できるだけ具体的な一人として）", type: "area", wide: true, modes: ["problem", "both"] },
+  { id: "now",      label: "その人が今どうやって困りごとに対処しているか、かかる時間や手間", type: "area", wide: true, modes: ["problem", "both"] },
   { group: "作ったもの・デモ" },
   { id: "made",     label: "作ったもの（何ができるか、実装済みの機能だけ）", type: "area", wide: true },
   { id: "notyet",   label: "まだ実装できていないこと", type: "area", wide: true },
@@ -205,7 +237,7 @@ const FIELDS = [
 
 // スクリプト例 2/4 に並ぶ順番（出力はこの順）
 const TEAM_ORDER = [
-  "team", "members", "project", "who", "now", "made", "notyet", "demoUrl", "demoOps",
+  "team", "members", "project", "mode", "ideaWhat", "ideaWhy", "ideaFor", "ideaDiff", "who", "now", "made", "notyet", "demoUrl", "demoOps",
   "aiTools", "aiFix", "aiSplit", "solana", "net", "txid", "codeUrl", "future",
 ];
 
@@ -232,31 +264,76 @@ const PART1 = [
   "- コードの中身や難しさは評価対象外",
 ];
 
-const PART3 = [
-  "## スライド構成（この順番・この枚数で固定）",
-  "1. 表紙：プロジェクト名、「誰の・何を・どうする」を表した一文キャッチコピー、チーム名、メンバーと担当、デモURL",
-  "2. 課題：誰のどんな困りごとか。現状のやり方とその負担を数字で1つ示す",
-  "3. 解決策：何を作ったか。主要画面の説明。現状のやり方との before / after 比較",
+// スライド 1〜3 は発表の型によって変える
+const SLIDES_1_3 = {
+  problem: [
+    "1. 表紙：プロジェクト名、「誰の・何を・どうする」を表した一文キャッチコピー、チーム名、メンバーと担当、デモURL",
+    "2. 課題：誰のどんな困りごとか。現状のやり方とその負担を数字で1つ示す",
+    "3. 解決策：何を作ったか。主要画面の説明。現状のやり方との before / after 比較",
+  ],
+  idea: [
+    "1. 表紙：プロジェクト名、「何を・どう面白く（新しく）するか」を表した一文キャッチコピー、チーム名、メンバーと担当、デモURL",
+    "2. アイデア：何を思いついたか、何が面白い・新しいか。思いついたきっかけと、誰がどんな場面で使う・楽しむか",
+    "3. 作ったもの：何を作ったか。主要画面の説明。似たもの・既存のやり方との違い（違いがわかる比較、または使ったときの体験の流れ）",
+  ],
+  both: [
+    "1. 表紙：プロジェクト名、アイデアの面白さと「誰の・何を・どうする」が伝わる一文キャッチコピー、チーム名、メンバーと担当、デモURL",
+    "2. アイデアと課題：何が面白い・新しいか。あわせて誰のどんな困りごとを解くか、現状のやり方とその負担を数字で1つ示す",
+    "3. 解決策：何を作ったか。主要画面の説明。現状のやり方との before / after 比較と、似たものとの違い",
+  ],
+};
+
+const PART3_REST = [
   "4. デモ：実演の流れ。見せる操作を順番に書き、デモが動かなかった場合に代わりに見せる静止画の指示も入れる",
   "5. なぜSolana／ブロックチェーンなのか：普通のデータベースではなくブロックチェーンを使う理由。構成図（ユーザー→アプリ→AI→Solana）の説明。オンチェーンの証跡",
   "6. AI活用メモ：使ったツールと用途の表、うまくいかなかったことと直し方を2例、開発にかかった時間などの数字",
   "7. 今後の展望とリンク一覧（デモURL、コード、Solana Explorer）",
 ];
 
-const PART4 = [
-  "## 守ってほしいこと",
-  "- 1スライド1メッセージ。スライド本文は体言止め・簡潔な箇条書きで、1枚あたり箇条書き4行以内、1行40字以内",
-  "- 文章は会話調にせず、スライドにそのまま貼れる文言にする",
-  "- **実装していない機能を、動くかのように書かないこと**。未実装のものは「今後」として明確に分ける",
-  "- 専門用語は、ブロックチェーンに詳しくない審査員にも通じる言い方に置き換える",
-  "- 「革新的」「圧倒的」などの空疎な形容は使わず、事実と数字で書く",
-  "",
-  "## 出力してほしいもの",
-  "1. スライド7枚分の本文（各スライドにタイトルと箇条書き、話す秒数の目安）",
-  "2. 3分で読み切れる発表原稿（合計180秒。デモに最も時間を割く配分。文字数の目安も示す）",
-  "3. 想定される質問と回答を5問（うち1問は「なぜブロックチェーンが必要なのか」、1問は「AIにどこまで任せたのか」）",
-  "4. この資料で審査5項目のうち弱い項目と、その補強案",
-  "",
+function part3(mode) {
+  return ["## スライド構成（この順番・この枚数で固定）", ...SLIDES_1_3[mode], ...PART3_REST];
+}
+
+// 発表の型ごとに追加する注意事項
+const MODE_RULES = {
+  problem: [],
+  idea: [
+    "- この作品は解決したい課題（困りごと）を前提にしていない「アイデア型」。**存在しない困りごとや、その負担の数字を作り出さないこと**。「課題」「解決策」という見出しも使わない",
+    "- 審査項目「アイデア・課題設定」は、アイデアの面白さ・新しさ、思いついたきっかけ、誰がどんな場面で使う・楽しむかで評価されるように組み立てる",
+    "- 数字は作り出さず、入力された事実（作った機能の数、開発時間、試した人の反応など）があるときだけ使う",
+  ],
+  both: [
+    "- アイデアの面白さ・新しさと、解決する困りごとの両方が伝わるようにする。どちらか一方に偏らせない",
+  ],
+};
+
+const QA_FOCUS = {
+  problem: "",
+  idea: "、1問は「これは誰がどんな場面で使うのか／何が面白いのか」",
+  both: "",
+};
+
+function part4(mode) {
+  return [
+    "## 守ってほしいこと",
+    "- 1スライド1メッセージ。スライド本文は体言止め・簡潔な箇条書きで、1枚あたり箇条書き4行以内、1行40字以内",
+    "- 文章は会話調にせず、スライドにそのまま貼れる文言にする",
+    "- **実装していない機能を、動くかのように書かないこと**。未実装のものは「今後」として明確に分ける",
+    "- 専門用語は、ブロックチェーンに詳しくない審査員にも通じる言い方に置き換える",
+    "- 「革新的」「圧倒的」などの空疎な形容は使わず、事実と数字で書く",
+    ...MODE_RULES[mode],
+    "",
+    "## 出力してほしいもの",
+    "1. スライド7枚分の本文（各スライドにタイトルと箇条書き、話す秒数の目安）",
+    "2. 3分で読み切れる発表原稿（合計180秒。デモに最も時間を割く配分。文字数の目安も示す）",
+    "3. 想定される質問と回答を5問（うち1問は「なぜブロックチェーンが必要なのか」、1問は「AIにどこまで任せたのか」" + QA_FOCUS[mode] + "）",
+    "4. この資料で審査5項目のうち弱い項目と、その補強案",
+    "",
+    ...PART4_TAIL,
+  ];
+}
+
+const PART4_TAIL = [
   "空欄のまま埋められていない項目があれば、資料を作る前に、特に重要な不足だけ3つまで質問してください。",
   "",
   "出力はPowerPointファイル（.pptx、16:9）としても保存してください。フォントは全スライド共通で、本文24pt以上にしてください。",
@@ -277,16 +354,28 @@ function formatValue(raw) {
   return { text: "\n" + lines.map(s => "  - " + s).join("\n"), empty: false };
 }
 
+const FIELD_BY_ID = Object.fromEntries(FIELDS.filter(f => f.id).map(f => [f.id, f]));
+
+function isActive(id, mode) {
+  const f = FIELD_BY_ID[id];
+  return !f.modes || f.modes.includes(mode);
+}
+
 function buildPrompt(values) {
-  const labelOf = Object.fromEntries(FIELDS.filter(f => f.id).map(f => [f.id, f.label]));
+  const mode = MODES[values.mode] ? values.mode : DEFAULT_MODE;
   const team = ["## チーム情報"];
   let blanks = 0;
   for (const id of TEAM_ORDER) {
+    if (!isActive(id, mode)) continue;
+    if (id === "mode") {
+      team.push("- " + FIELD_BY_ID[id].label + "：" + MODES[mode].team);
+      continue;
+    }
     const v = formatValue(values[id]);
     if (v.empty) blanks++;
-    team.push("- " + labelOf[id] + "：" + v.text);
+    team.push("- " + FIELD_BY_ID[id].label + "：" + v.text);
   }
-  const text = [PART1.join("\n"), team.join("\n"), PART3.join("\n"), PART4.join("\n")].join("\n\n");
+  const text = [PART1.join("\n"), team.join("\n"), part3(mode).join("\n"), part4(mode).join("\n")].join("\n\n");
   return { text, blanks };
 }
 
@@ -310,8 +399,9 @@ function renderForm() {
     const wrap = document.createElement("div");
     wrap.className = "field" + (f.wide ? " wide" : "");
     wrap.dataset.id = f.id;
+    if (f.modes) wrap.dataset.modes = f.modes.join(" ");
     const label = document.createElement("label");
-    label.htmlFor = "f_" + f.id;
+    if (f.type !== "mode") label.htmlFor = "f_" + f.id;
     label.textContent = f.label;
     wrap.appendChild(label);
     if (f.hint) {
@@ -319,6 +409,31 @@ function renderForm() {
       h.className = "hint";
       h.textContent = f.hint;
       wrap.appendChild(h);
+    }
+    if (f.type === "mode") {
+      const box = document.createElement("div");
+      box.className = "modes";
+      for (const [key, m] of Object.entries(MODES)) {
+        const opt = document.createElement("label");
+        opt.className = "mode-opt";
+        const r = document.createElement("input");
+        r.type = "radio";
+        r.name = "mode";
+        r.value = key;
+        r.defaultChecked = key === DEFAULT_MODE;
+        r.addEventListener("change", applyMode);
+        const txt = document.createElement("span");
+        const b = document.createElement("b");
+        b.textContent = m.label;
+        const s = document.createElement("small");
+        s.textContent = m.desc;
+        txt.append(b, s);
+        opt.append(r, txt);
+        box.appendChild(opt);
+      }
+      wrap.appendChild(box);
+      grid.appendChild(wrap);
+      continue;
     }
     const input = f.type === "area" ? document.createElement("textarea") : document.createElement("input");
     if (f.type !== "area") input.type = "text";
@@ -330,9 +445,25 @@ function renderForm() {
   }
 }
 
+function currentMode() {
+  const r = document.querySelector('input[name="mode"]:checked');
+  return r ? r.value : DEFAULT_MODE;
+}
+
+// 発表の型に合わない項目は隠す（入力済みの内容は消さずに残す）
+function applyMode() {
+  const mode = currentMode();
+  document.querySelectorAll(".field[data-modes]").forEach(el => {
+    el.hidden = !el.dataset.modes.split(" ").includes(mode);
+  });
+}
+
 function readValues() {
   const values = {};
-  for (const f of FIELDS) if (f.id) values[f.id] = document.getElementById("f_" + f.id).value;
+  for (const f of FIELDS) {
+    if (!f.id) continue;
+    values[f.id] = f.type === "mode" ? currentMode() : document.getElementById("f_" + f.id).value;
+  }
   return values;
 }
 
@@ -348,7 +479,9 @@ function onBuild() {
   const values = readValues();
   const { text, blanks } = buildPrompt(values);
   document.querySelectorAll(".field").forEach(el => {
-    el.classList.toggle("empty-mark", formatValue(values[el.dataset.id]).empty);
+    const id = el.dataset.id;
+    const mark = id !== "mode" && isActive(id, values.mode) && formatValue(values[id]).empty;
+    el.classList.toggle("empty-mark", mark);
   });
   const out = document.getElementById("output");
   out.value = text;
@@ -390,6 +523,7 @@ function onSave() {
 function onClear() {
   if (!confirm("入力した内容をすべて消します。よろしいですか？")) return;
   document.getElementById("teamForm").reset();
+  applyMode();
   document.querySelectorAll(".field").forEach(el => el.classList.remove("empty-mark"));
   document.getElementById("status").textContent = "";
   document.getElementById("resultCard").style.display = "none";
@@ -397,6 +531,7 @@ function onClear() {
 
 if (typeof document !== "undefined") {
   renderForm();
+  applyMode();
   document.getElementById("btnBuild").addEventListener("click", onBuild);
   document.getElementById("btnCopy").addEventListener("click", onCopy);
   document.getElementById("btnSave").addEventListener("click", onSave);
